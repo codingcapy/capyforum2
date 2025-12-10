@@ -7,6 +7,7 @@ import gleam/option
 import gleam/result
 import gleam/uri
 import lib/async_data
+import login
 import lustre
 import lustre/attribute.{class}
 import lustre/effect.{type Effect}
@@ -17,11 +18,20 @@ import modem
 import plinth/browser/window
 import posts
 import rsvp
+import signup
 
 pub fn main() -> Nil {
   let app = lustre.application(init, update, view)
   let assert Ok(_) = lustre.start(app, "#app", Nil)
   io.println("Hello from capyforum2!")
+}
+
+pub fn init(_) -> #(Model, effect.Effect(message.Msg)) {
+  let route = initial_route()
+  let model = Model(route:, user: async_data.NotAsked)
+  let #(model, data_fx) = ensure_data(model)
+  let fx = effect.batch([modem.init(on_url_change), data_fx])
+  #(model, fx)
 }
 
 fn initial_route() -> model.Route {
@@ -30,7 +40,8 @@ fn initial_route() -> model.Route {
   |> fn(path) {
     case path {
       Ok([]) -> model.NotAuthenticated(model.Posts)
-      Ok(["login"]) -> model.NotAuthenticated(model.Posts)
+      Ok(["login"]) -> model.NotAuthenticated(model.Login)
+      Ok(["signup"]) -> model.NotAuthenticated(model.Signup)
       Ok(["create"]) -> model.NotAuthenticated(model.Create)
       Ok(["dashboard", user_id]) -> {
         let user_id = int.parse(user_id)
@@ -45,12 +56,28 @@ fn initial_route() -> model.Route {
   }
 }
 
-pub fn init(_) -> #(Model, effect.Effect(message.Msg)) {
-  let route = initial_route()
-  let model = Model(route:, user: async_data.NotAsked)
-  let #(model, data_fx) = ensure_data(model)
-  let fx = effect.batch([modem.init(on_url_change), data_fx])
-  #(model, fx)
+fn ensure_data(model: model.Model) {
+  let model.Model(user:, ..) = model
+  let #(user, user_fx) = case user {
+    async_data.NotAsked -> #(
+      async_data.Loading,
+      api.get_me(message.ApiReturnedUser),
+    )
+
+    async_data.Loading -> #(user, effect.none())
+    async_data.Done(_) -> #(user, effect.none())
+  }
+  #(Model(..model, user: user), effect.batch([user_fx]))
+}
+
+fn on_url_change(uri: uri.Uri) -> message.Msg {
+  case uri.path_segments(uri.path) {
+    [] -> model.NotAuthenticated(model.Posts) |> message.OnRouteChange
+    ["create"] -> model.NotAuthenticated(model.Create) |> message.OnRouteChange
+    ["login"] -> model.NotAuthenticated(model.Login) |> message.OnRouteChange
+    ["signup"] -> model.NotAuthenticated(model.Signup) |> message.OnRouteChange
+    [_, ..] -> model.NotAuthenticated(model.Posts) |> message.OnRouteChange
+  }
 }
 
 fn update(model: Model, msg: message.Msg) -> #(Model, Effect(message.Msg)) {
@@ -123,13 +150,6 @@ fn update(model: Model, msg: message.Msg) -> #(Model, Effect(message.Msg)) {
   }
 }
 
-fn guard_route(
-  route: model.Route,
-  async_data: async_data.AsyncData(api.User, rsvp.Error),
-) -> #(model.Route, Effect(message.Msg)) {
-  todo
-}
-
 fn view(model: Model) {
   html.div(
     [class("flex flex-col min-h-screen bg-[#202020] text-white text-2xl")],
@@ -139,31 +159,11 @@ fn view(model: Model) {
         model.Authenticated(model.Dashboard) -> posts.view()
         model.NotAuthenticated(model.Posts) -> posts.view()
         model.NotAuthenticated(model.Create) -> create.view()
+        model.NotAuthenticated(model.Login) -> login.view()
+        model.NotAuthenticated(model.Signup) -> signup.view()
       },
     ],
   )
-}
-
-fn ensure_data(model: model.Model) {
-  let model.Model(user:, ..) = model
-  let #(user, user_fx) = case user {
-    async_data.NotAsked -> #(
-      async_data.Loading,
-      api.get_me(message.ApiReturnedUser),
-    )
-
-    async_data.Loading -> #(user, effect.none())
-    async_data.Done(_) -> #(user, effect.none())
-  }
-  #(Model(..model, user: user), effect.batch([user_fx]))
-}
-
-fn on_url_change(uri: uri.Uri) -> message.Msg {
-  case uri.path_segments(uri.path) {
-    [] -> model.NotAuthenticated(model.Posts) |> message.OnRouteChange
-    ["create"] -> model.NotAuthenticated(model.Create) |> message.OnRouteChange
-    [_, ..] -> model.NotAuthenticated(model.Posts) |> message.OnRouteChange
-  }
 }
 
 fn view_header() {
@@ -189,23 +189,32 @@ fn view_header() {
           ],
           [html.text("+ Create")],
         ),
-        html.div(
+        html.a(
           [
             class(
               "px-2 hover:text-[#8778D7] transition-all ease-in-out duration-300 cursor-pointer",
             ),
+            attribute.href("/login"),
           ],
           [html.text("Login")],
         ),
-        html.div(
+        html.a(
           [
             class(
               "px-2 hover:text-[#8778D7] transition-all ease-in-out duration-300 cursor-pointer",
             ),
+            attribute.href("/signup"),
           ],
           [html.text("Signup")],
         ),
       ]),
     ],
   )
+}
+
+fn guard_route(
+  route: model.Route,
+  async_data: async_data.AsyncData(api.User, rsvp.Error),
+) -> #(model.Route, Effect(message.Msg)) {
+  todo
 }
