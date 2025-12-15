@@ -6,5 +6,6 @@ pub type Msg {
   OnRouteChange(model.Route)
   ApiReturnedUser(Result(api.User, rsvp.Error))
   Navigate(route: String)
+  UserSubmittedCreatePost
   None
 }

@@ -23,7 +23,7 @@ import signup
 pub fn main() -> Nil {
   let app = lustre.application(init, update, view)
   let assert Ok(_) = lustre.start(app, "#app", Nil)
-  io.println("Hello from capyforum2!")
+  io.println("Hello!")
 }
 
 pub fn init(_) -> #(Model, effect.Effect(message.Msg)) {
@@ -146,7 +146,8 @@ fn update(model: Model, msg: message.Msg) -> #(Model, Effect(message.Msg)) {
         _, _ -> #(model, load_fx)
       }
     }
-    message.None -> todo
+    message.UserSubmittedCreatePost -> todo
+    message.None -> #(model, effect.none())
   }
 }
 
@@ -174,7 +175,7 @@ fn view_header() {
         html.div([class("flex")], [
           html.img([attribute.src("/logo.png")]),
           html.div([class("tracking-[0.25rem] ml-2 cursor-pointer")], [
-            html.text("CAPYFORUM2"),
+            html.text("CAPYFORUM"),
           ]),
         ]),
       ]),

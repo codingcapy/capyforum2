@@ -14,6 +14,8 @@ pub type Route {
 pub type PublicRoute {
   Posts
   Create
+  Login
+  Signup
 }
 
 pub type SecureRoute {
