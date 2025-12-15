@@ -8,5 +8,7 @@ pub type Msg {
   Navigate(route: String)
   UserSubmittedCreatePost
   ApiCreatedPost(Result(api.Post, rsvp.Error))
+  ApiReturnedPosts(Result(List(api.Post), rsvp.Error))
+  UserSubmittedSignup
   None
 }

@@ -212,8 +212,48 @@ fn update(model: Model, msg: message.Msg) -> #(Model, Effect(message.Msg)) {
         }
       }
     }
+    message.ApiCreatedPost(Ok(new_post)) -> {
+      let posts = case model.posts {
+        async_data.Done(Ok(existing_posts)) ->
+          async_data.Done(Ok(
+            existing_posts
+            |> list.map(fn(post) {
+              case post.id == 0 {
+                True -> new_post
+                False -> post
+              }
+            }),
+          ))
+        async_data.NotAsked | async_data.Loading ->
+          async_data.Done(Ok([new_post]))
+        async_data.Done(Error(e)) -> async_data.Done(Error(e))
+      }
+
+      let create_post_ui = model.initial_create_post_ui()
+
+      #(
+        Model(..model, posts:, create_post_ui:),
+        effect.batch([
+          api.get_posts(message.ApiReturnedPosts),
+        ]),
+      )
+    }
+
+    message.ApiCreatedPost(Error(error)) -> {
+      echo error
+
+      let posts = {
+        use posts <- async_data.map(model.posts)
+        posts
+        |> list.filter(fn(post) { post.id != 0 })
+      }
+
+      #(Model(..model, posts:), effect.none())
+    }
+    message.ApiReturnedPosts(posts) ->
+      Model(..model, posts: posts |> async_data.Done) |> ensure_data()
+    message.UserSubmittedSignup -> todo
     message.None -> #(model, effect.none())
-    message.ApiCreatedPost(_) -> todo
   }
 }
 

@@ -6,10 +6,10 @@ import rsvp
 pub type User {
   User(
     id: String,
-    email: String,
     username: String,
-    created_at: String,
+    email: String,
     password: String,
+    created_at: String,
     active: Bool,
   )
 }
@@ -33,7 +33,7 @@ fn user_decoder() -> decode.Decoder(User) {
   use password <- decode.field("password", decode.string)
   use created_at <- decode.field("createdAt", decode.string)
   use active <- decode.field("active", decode.bool)
-  decode.success(User(id:, email:, username:, password:, created_at:, active:))
+  decode.success(User(id:, username:, email:, password:, created_at:, active:))
 }
 
 fn post_decoder() -> decode.Decoder(Post) {
@@ -71,4 +71,12 @@ pub fn post_create_post(
     ]),
     handler,
   )
+}
+
+pub fn get_posts(msg_wrapper wrapper) {
+  let handler = {
+    rsvp.expect_json(decode.list(post_decoder()), wrapper)
+  }
+
+  rsvp.get(base_url() <> "/posts", handler)
 }
