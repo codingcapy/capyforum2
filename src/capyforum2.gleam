@@ -3,8 +3,10 @@ import create
 import gleam/http/response
 import gleam/int
 import gleam/io
+import gleam/list
 import gleam/option
 import gleam/result
+import gleam/string
 import gleam/uri
 import lib/async_data
 import login
@@ -28,7 +30,13 @@ pub fn main() -> Nil {
 
 pub fn init(_) -> #(Model, effect.Effect(message.Msg)) {
   let route = initial_route()
-  let model = Model(route:, user: async_data.NotAsked)
+  let model =
+    Model(
+      route:,
+      user: async_data.NotAsked,
+      posts: async_data.NotAsked,
+      create_post_ui: model.initial_create_post_ui(),
+    )
   let #(model, data_fx) = ensure_data(model)
   let fx = effect.batch([modem.init(on_url_change), data_fx])
   #(model, fx)
@@ -146,8 +154,66 @@ fn update(model: Model, msg: message.Msg) -> #(Model, Effect(message.Msg)) {
         _, _ -> #(model, load_fx)
       }
     }
-    message.UserSubmittedCreatePost -> todo
+    message.UserSubmittedCreatePost -> {
+      let post_title = model.create_post_ui.post_title |> string.trim()
+      let post_content = model.create_post_ui.post_content |> string.trim()
+
+      case post_title == "" {
+        True -> #(model, effect.none())
+        False -> {
+          let model_fx = {
+            use posts <- async_data.map(model.posts)
+
+            let post =
+              api.Post(
+                id: 0,
+                title: post_title,
+                content: post_content,
+                created_at: todo,
+              )
+
+            let fx =
+              api.post_create_post(
+                fn(returned) {
+                  returned
+                  |> result.try(fn(items) {
+                    list.first(items)
+                    |> result.map_error(fn(_) {
+                      rsvp.HttpError(response.Response(404, [], ""))
+                    })
+                  })
+                  |> message.ApiCreatedPost
+                },
+                id: post.id,
+                title: post.title,
+                content: post.content,
+              )
+
+            let create_post_ui =
+              model.CreatePostUi(
+                ..model.create_post_ui,
+                is_creating: async_data.Loading,
+              )
+
+            #(
+              Model(
+                ..model,
+                posts: posts
+                  |> list.append([post])
+                  |> Ok
+                  |> async_data.Done,
+                create_post_ui:,
+              ),
+              fx,
+            )
+          }
+
+          model_fx |> async_data.unwrap(#(model, effect.none()))
+        }
+      }
+    }
     message.None -> #(model, effect.none())
+    message.ApiCreatedPost(_) -> todo
   }
 }
 

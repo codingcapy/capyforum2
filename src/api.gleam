@@ -65,7 +65,7 @@ pub fn post_create_post(
   rsvp.post(
     base_url() <> "/posts",
     json.object([
-      #("id", json.string(id)),
+      #("id", json.int(id)),
       #("title", json.string(title)),
       #("content", json.string(content)),
     ]),
